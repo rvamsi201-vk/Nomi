@@ -13,11 +13,11 @@ One Next.js app. One SQLite file. No Docker. No Mattermost. No PostgreSQL.
 
 ---
 
-## Fresh install on a server (recommended)
+## Fresh install on a server
 
 ```bash
-git clone <YOUR_REPO_URL> nomi
-cd nomi
+git clone https://github.com/rvamsi201-vk/Nomi.git
+cd Nomi
 cp .env.example .env
 npm run setup
 npm run build
@@ -26,17 +26,23 @@ npm start
 
 Open **http://SERVER_IP:3001**
 
-This repo includes a starter database at `data/nomi.db` with demo users and sample data.
+The database ships **empty** (schema only). First-time setup in the browser:
+
+1. Go to **/register** → create company workspace + admin account  
+2. Sign in as that admin  
+3. Open **Team** → add employees (name, email, temporary password)  
+4. Employees sign in at **/login** (they do not self-register)
+
+Once a workspace exists, public registration is locked.
+
+---
 
 ## How orgs & employees work
 
-1. **Admin** creates the workspace (company name + admin email) — or uses the seeded admin.
-2. Admin opens **Team** in the sidebar and adds employees (name, email, temporary password).
-3. Employees sign in and only see that company’s channels, DMs, projects, and tasks.
-4. Open self-registration is disabled once a workspace exists.
-
-**Demo admin:** `raghu@nomi.local` / `password123`  
-**Demo member:** `alex@nomi.local` / `password123`
+| Role | What they do |
+|------|----------------|
+| **Admin** | Creates the org, adds/removes employees from **Team** |
+| **Member** | Uses channels, DMs, projects, and tasks inside that org |
 
 ---
 
@@ -48,19 +54,24 @@ npm run setup
 npm run dev
 ```
 
-Open http://localhost:3001
+Open http://localhost:3001/register to create your first workspace.
+
+Optional demo data (local only):
+
+```bash
+npm run db:seed
+```
 
 ---
 
-## Optional: reset database from scratch
-
-If you want a clean DB instead of the included one:
+## Reset database (clean again)
 
 ```bash
 rm -f data/nomi.db
 npx prisma migrate deploy
-npm run db:seed
 ```
+
+Then create the org again via **/register**.
 
 ---
 
@@ -68,28 +79,17 @@ npm run db:seed
 
 | Feature | Status |
 |---------|--------|
-| Login / register | Yes |
+| Create org + admin | Yes (`/register` first time) |
+| Admin adds employees | Yes (`/team`) |
 | Public channels + messaging | Yes |
 | Direct messages | Yes |
 | Projects (+ linked `#proj-*` channel) | Yes |
 | Task kanban + global task list | Yes |
-| SQLite database (`data/nomi.db`) | Yes (committed) |
+| Clean SQLite DB (`data/nomi.db`) | Yes (empty until first register) |
 
 ---
 
-## Files your friend needs
-
-| File | Purpose |
-|------|---------|
-| `.env` | Copy from `.env.example` (already correct for SQLite) |
-| `data/nomi.db` | App database (ships with the repo) |
-| `prisma/migrations/` | Schema history for `migrate deploy` |
-
-Do **not** commit secrets later. Demo passwords are only for local/team bootstrap — change them for production.
-
----
-
-## Run in background on a Linux server (pm2)
+## Run in background (pm2)
 
 ```bash
 npm install -g pm2

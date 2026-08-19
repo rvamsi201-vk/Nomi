@@ -17,9 +17,6 @@ export default function LoginPage() {
         <Suspense>
           <LoginForm />
         </Suspense>
-        <p className="mt-6 text-center text-xs text-[var(--muted)]">
-          Demo admin: raghu@nomi.local / password123
-        </p>
       </div>
     </div>
   );
