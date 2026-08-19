@@ -1,0 +1,19 @@
+# dependencies
+/node_modules
+/.next/
+/out/
+
+# env (keep .env.example)
+.env
+.env*.local
+
+# misc
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+
+# sqlite journals / temp (commit the main db)
+/data/*.db-journal
+/data/*.db-wal
+/data/*.db-shm
+/prisma/data/

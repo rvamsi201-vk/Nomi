@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String          @id @default(cuid())
+  name         String
+  email        String          @unique
+  passwordHash String
+  createdAt    DateTime        @default(now())
+  memberships  ChannelMember[]
+  messages     Message[]
+  projects     Project[]       @relation("ProjectOwner")
+  assignedTasks Task[]         @relation("TaskAssignee")
+}
+
+model Channel {
+  id        String          @id @default(cuid())
+  name      String
+  slug      String          @unique
+  type      String          @default("public") // public | dm
+  createdAt DateTime        @default(now())
+  members   ChannelMember[]
+  messages  Message[]
+  project   Project?
+}
+
+model ChannelMember {
+  channelId String
+  userId    String
+  channel   Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, userId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  channelId String
+  userId    String
+  text      String
+  createdAt DateTime @default(now())
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([channelId, createdAt])
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String   @default("")
+  channelId   String?  @unique
+  ownerId     String
+  createdAt   DateTime @default(now())
+  owner       User     @relation("ProjectOwner", fields: [ownerId], references: [id])
+  channel     Channel? @relation(fields: [channelId], references: [id])
+  tasks       Task[]
+}
+
+model Task {
+  id         String   @id @default(cuid())
+  projectId  String
+  title      String
+  status     String   @default("todo") // backlog | todo | in_progress | done
+  assigneeId String?
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee   User?    @relation("TaskAssignee", fields: [assigneeId], references: [id])
+}
