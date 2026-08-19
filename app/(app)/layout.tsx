@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getMembership } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { CreateChannelForm } from "@/components/create-channel-form";
 import { LogoutButton } from "@/components/logout-button";
@@ -11,39 +11,50 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const user = await getCurrentUser();
+  const membership = user ? await getMembership(user.id) : null;
+  const orgId = membership?.orgId;
 
-  const channels = user
-    ? await prisma.channel.findMany({
-        where: {
-          type: "public",
-          members: { some: { userId: user.id } },
-        },
-        orderBy: { name: "asc" },
-      })
-    : [];
-
-  const dmChannels = user
-    ? await prisma.channel.findMany({
-        where: {
-          type: "dm",
-          members: { some: { userId: user.id } },
-        },
-        include: {
-          members: {
-            include: { user: { select: { id: true, name: true } } },
+  const channels =
+    user && orgId
+      ? await prisma.channel.findMany({
+          where: {
+            organizationId: orgId,
+            type: "public",
+            members: { some: { userId: user.id } },
           },
-        },
-        orderBy: { createdAt: "desc" },
-      })
-    : [];
+          orderBy: { name: "asc" },
+        })
+      : [];
 
-  const teammates = user
-    ? await prisma.user.findMany({
-        where: { id: { not: user.id } },
-        select: { id: true, name: true, email: true },
-        orderBy: { name: "asc" },
-      })
-    : [];
+  const dmChannels =
+    user && orgId
+      ? await prisma.channel.findMany({
+          where: {
+            organizationId: orgId,
+            type: "dm",
+            members: { some: { userId: user.id } },
+          },
+          include: {
+            members: {
+              include: { user: { select: { id: true, name: true } } },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        })
+      : [];
+
+  const teammates =
+    user && orgId
+      ? (
+          await prisma.orgMember.findMany({
+            where: { orgId, userId: { not: user.id } },
+            include: {
+              user: { select: { id: true, name: true, email: true } },
+            },
+            orderBy: { userId: "asc" },
+          })
+        ).map((m) => m.user)
+      : [];
 
   const dms = dmChannels.map((channel) => {
     const other = channel.members.find((m) => m.userId !== user!.id)?.user;
@@ -64,7 +75,9 @@ export default async function AppLayout({
             </div>
             <div>
               <p className="font-semibold">Nomi</p>
-              <p className="text-xs text-[var(--muted)]">Team workspace</p>
+              <p className="truncate text-xs text-[var(--muted)]">
+                {membership?.org.name ?? "Team workspace"}
+              </p>
             </div>
           </div>
         </div>
@@ -122,12 +135,23 @@ export default async function AppLayout({
             >
               Tasks
             </Link>
+            <Link
+              href="/team"
+              className="block rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 hover:text-white"
+            >
+              Team
+            </Link>
           </nav>
         </div>
 
         <div className="border-t border-[var(--border)] p-4">
           <p className="mb-1 text-sm font-medium">{user?.name}</p>
-          <p className="mb-3 truncate text-xs text-[var(--muted)]">{user?.email}</p>
+          <p className="mb-1 truncate text-xs text-[var(--muted)]">{user?.email}</p>
+          {membership ? (
+            <p className="mb-3 text-[11px] capitalize text-zinc-500">
+              {membership.role}
+            </p>
+          ) : null}
           <LogoutButton />
         </div>
       </aside>

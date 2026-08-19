@@ -11,14 +11,14 @@ export default function LoginPage() {
           </div>
           <div>
             <h1 className="text-xl font-semibold">Sign in to Nomi</h1>
-            <p className="text-sm text-[var(--muted)]">Team chat made simple</p>
+            <p className="text-sm text-[var(--muted)]">Your company workspace</p>
           </div>
         </div>
         <Suspense>
           <LoginForm />
         </Suspense>
         <p className="mt-6 text-center text-xs text-[var(--muted)]">
-          Demo: raghu@nomi.local / password123
+          Demo admin: raghu@nomi.local / password123
         </p>
       </div>
     </div>

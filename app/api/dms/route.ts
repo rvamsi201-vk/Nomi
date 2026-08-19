@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireMembership } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { dmSlug } from "@/lib/dms";
 
 export async function GET() {
   try {
-    const user = await requireUser();
+    const { user, org } = await requireMembership();
     const channels = await prisma.channel.findMany({
       where: {
+        organizationId: org.id,
         type: "dm",
         members: { some: { userId: user.id } },
       },
@@ -37,7 +38,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser();
+    const { user, org } = await requireMembership();
     const body = await request.json();
     const otherUserId = String(body.userId ?? "");
 
@@ -45,17 +46,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Pick a teammate" }, { status: 400 });
     }
 
-    const other = await prisma.user.findUnique({ where: { id: otherUserId } });
-    if (!other) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    const otherMembership = await prisma.orgMember.findUnique({
+      where: {
+        orgId_userId: { orgId: org.id, userId: otherUserId },
+      },
+      include: { user: true },
+    });
+
+    if (!otherMembership) {
+      return NextResponse.json(
+        { error: "That person is not in your workspace" },
+        { status: 404 },
+      );
     }
 
+    const other = otherMembership.user;
     const slug = dmSlug(user.id, other.id);
-    let channel = await prisma.channel.findUnique({ where: { slug } });
+
+    let channel = await prisma.channel.findUnique({
+      where: {
+        organizationId_slug: { organizationId: org.id, slug },
+      },
+    });
 
     if (!channel) {
       channel = await prisma.channel.create({
         data: {
+          organizationId: org.id,
           name: "dm",
           slug,
           type: "dm",

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
+import { requireMembership } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 const statusStyles: Record<string, string> = {
@@ -10,9 +10,10 @@ const statusStyles: Record<string, string> = {
 };
 
 export default async function TasksPage() {
-  await requireUser();
+  const { org } = await requireMembership();
 
   const tasks = await prisma.task.findMany({
+    where: { project: { organizationId: org.id } },
     include: {
       project: { select: { name: true, slug: true } },
       assignee: { select: { name: true } },
@@ -25,7 +26,7 @@ export default async function TasksPage() {
       <header className="border-b border-[var(--border)] px-8 py-6">
         <h1 className="text-2xl font-semibold">Tasks</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          All tasks across projects
+          All tasks in {org.name}
         </p>
       </header>
 

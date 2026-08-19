@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireMembership } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 
 export async function GET() {
   try {
-    await requireUser();
+    const { org } = await requireMembership();
     const projects = await prisma.project.findMany({
+      where: { organizationId: org.id },
       include: {
         owner: { select: { id: true, name: true } },
         channel: { select: { id: true, slug: true, name: true } },
@@ -22,7 +23,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser();
+    const { user, org } = await requireMembership();
     const body = await request.json();
     const name = String(body.name ?? "").trim();
     const description = String(body.description ?? "").trim();
@@ -35,7 +36,13 @@ export async function POST(request: Request) {
     const base = slugify(name) || "project";
     let slug = base;
     let n = 1;
-    while (await prisma.project.findUnique({ where: { slug } })) {
+    while (
+      await prisma.project.findUnique({
+        where: {
+          organizationId_slug: { organizationId: org.id, slug },
+        },
+      })
+    ) {
       slug = `${base}-${n++}`;
     }
 
@@ -46,18 +53,29 @@ export async function POST(request: Request) {
       const channelName = `proj-${slug}`.slice(0, 48);
       let cSlug = channelName;
       let i = 1;
-      while (await prisma.channel.findUnique({ where: { slug: cSlug } })) {
+      while (
+        await prisma.channel.findUnique({
+          where: {
+            organizationId_slug: { organizationId: org.id, slug: cSlug },
+          },
+        })
+      ) {
         cSlug = `${channelName}-${i++}`;
       }
 
-      const users = await prisma.user.findMany();
+      const members = await prisma.orgMember.findMany({
+        where: { orgId: org.id },
+        select: { userId: true },
+      });
+
       const channel = await prisma.channel.create({
         data: {
+          organizationId: org.id,
           name: cSlug,
           slug: cSlug,
           type: "public",
           members: {
-            create: users.map((u) => ({ userId: u.id })),
+            create: members.map((m) => ({ userId: m.userId })),
           },
           messages: {
             create: {
@@ -73,6 +91,7 @@ export async function POST(request: Request) {
 
     const project = await prisma.project.create({
       data: {
+        organizationId: org.id,
         name,
         slug,
         description,
@@ -85,10 +104,7 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json(
-      { ...project, channelSlug },
-      { status: 201 },
-    );
+    return NextResponse.json({ ...project, channelSlug }, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Failed to create project" }, { status: 500 });

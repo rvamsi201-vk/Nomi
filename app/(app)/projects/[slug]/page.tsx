@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CreateTaskForm } from "@/components/create-task-form";
 import { KanbanBoard } from "@/components/kanban-board";
-import { requireUser } from "@/lib/auth";
+import { requireMembership } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export default async function ProjectDetailPage({
@@ -10,11 +10,13 @@ export default async function ProjectDetailPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  await requireUser();
+  const { org } = await requireMembership();
   const { slug } = await params;
 
   const project = await prisma.project.findUnique({
-    where: { slug },
+    where: {
+      organizationId_slug: { organizationId: org.id, slug },
+    },
     include: {
       owner: { select: { name: true } },
       channel: { select: { slug: true, name: true } },
@@ -29,9 +31,10 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const users = await prisma.user.findMany({
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
+  const members = await prisma.orgMember.findMany({
+    where: { orgId: org.id },
+    include: { user: { select: { id: true, name: true } } },
+    orderBy: { userId: "asc" },
   });
 
   return (
@@ -88,7 +91,10 @@ export default async function ProjectDetailPage({
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
-          <CreateTaskForm projectId={project.id} users={users} />
+          <CreateTaskForm
+            projectId={project.id}
+            users={members.map((m) => m.user)}
+          />
           <div>
             <h2 className="mb-4 text-lg font-medium">Board</h2>
             <KanbanBoard tasks={project.tasks} />

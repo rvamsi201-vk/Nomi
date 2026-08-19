@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireMembership } from "@/lib/auth";
 import { isTaskStatus } from "@/lib/constants";
 import { prisma } from "@/lib/db";
 
 export async function GET() {
   try {
-    await requireUser();
+    const { org } = await requireMembership();
     const tasks = await prisma.task.findMany({
+      where: { project: { organizationId: org.id } },
       include: {
         project: { select: { id: true, name: true, slug: true } },
         assignee: { select: { id: true, name: true } },
@@ -21,7 +22,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireUser();
+    const { user, org } = await requireMembership();
     const body = await request.json();
     const projectId = String(body.projectId ?? "");
     const title = String(body.title ?? "").trim();
@@ -39,8 +40,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
+    const project = await prisma.project.findFirst({
+      where: { id: projectId, organizationId: org.id },
       include: { channel: true },
     });
 
@@ -49,9 +50,16 @@ export async function POST(request: Request) {
     }
 
     if (assigneeId) {
-      const assignee = await prisma.user.findUnique({ where: { id: assigneeId } });
-      if (!assignee) {
-        return NextResponse.json({ error: "Assignee not found" }, { status: 404 });
+      const member = await prisma.orgMember.findUnique({
+        where: {
+          orgId_userId: { orgId: org.id, userId: assigneeId },
+        },
+      });
+      if (!member) {
+        return NextResponse.json(
+          { error: "Assignee must be in your workspace" },
+          { status: 400 },
+        );
       }
     }
 

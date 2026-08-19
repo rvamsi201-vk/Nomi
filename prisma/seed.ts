@@ -7,6 +7,15 @@ const prisma = new PrismaClient();
 async function main() {
   const passwordHash = await hash("password123", 10);
 
+  const org = await prisma.organization.upsert({
+    where: { slug: "exora" },
+    update: {},
+    create: {
+      name: "Exora Solutions",
+      slug: "exora",
+    },
+  });
+
   const raghu = await prisma.user.upsert({
     where: { email: "raghu@nomi.local" },
     update: { passwordHash },
@@ -27,10 +36,25 @@ async function main() {
     },
   });
 
+  await prisma.orgMember.upsert({
+    where: { orgId_userId: { orgId: org.id, userId: raghu.id } },
+    update: { role: "admin" },
+    create: { orgId: org.id, userId: raghu.id, role: "admin" },
+  });
+
+  await prisma.orgMember.upsert({
+    where: { orgId_userId: { orgId: org.id, userId: alex.id } },
+    update: { role: "member" },
+    create: { orgId: org.id, userId: alex.id, role: "member" },
+  });
+
   const general = await prisma.channel.upsert({
-    where: { slug: "general" },
+    where: {
+      organizationId_slug: { organizationId: org.id, slug: "general" },
+    },
     update: {},
     create: {
+      organizationId: org.id,
       name: "general",
       slug: "general",
       type: "public",
@@ -38,9 +62,12 @@ async function main() {
   });
 
   const random = await prisma.channel.upsert({
-    where: { slug: "random" },
+    where: {
+      organizationId_slug: { organizationId: org.id, slug: "random" },
+    },
     update: {},
     create: {
+      organizationId: org.id,
       name: "random",
       slug: "random",
       type: "public",
@@ -68,16 +95,21 @@ async function main() {
       data: {
         channelId: general.id,
         userId: raghu.id,
-        text: "Welcome to Nomi! This is #general — say hello to the team.",
+        text: "Welcome to the workspace! Admins can add employees from Team.",
       },
     });
   }
 
   const dmSlugValue = dmSlug(raghu.id, alex.id);
-  let dm = await prisma.channel.findUnique({ where: { slug: dmSlugValue } });
+  let dm = await prisma.channel.findUnique({
+    where: {
+      organizationId_slug: { organizationId: org.id, slug: dmSlugValue },
+    },
+  });
   if (!dm) {
     dm = await prisma.channel.create({
       data: {
+        organizationId: org.id,
         name: "dm",
         slug: dmSlugValue,
         type: "dm",
@@ -95,12 +127,15 @@ async function main() {
   }
 
   let project = await prisma.project.findUnique({
-    where: { slug: "nomi-launch" },
+    where: {
+      organizationId_slug: { organizationId: org.id, slug: "nomi-launch" },
+    },
   });
 
   if (!project) {
     const projChannel = await prisma.channel.create({
       data: {
+        organizationId: org.id,
         name: "proj-nomi-launch",
         slug: "proj-nomi-launch",
         type: "public",
@@ -112,6 +147,7 @@ async function main() {
 
     project = await prisma.project.create({
       data: {
+        organizationId: org.id,
         name: "Nomi Launch",
         slug: "nomi-launch",
         description: "Ship the internal team workspace.",
@@ -162,7 +198,9 @@ async function main() {
   }
 
   console.log("Seed complete");
-  console.log("Login: raghu@nomi.local / password123");
+  console.log("Org: Exora Solutions");
+  console.log("Admin: raghu@nomi.local / password123");
+  console.log("Member: alex@nomi.local / password123");
 }
 
 main()

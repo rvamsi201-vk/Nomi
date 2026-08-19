@@ -28,7 +28,15 @@ Open **http://SERVER_IP:3001**
 
 This repo includes a starter database at `data/nomi.db` with demo users and sample data.
 
-**Demo login:** `raghu@nomi.local` / `password123`
+## How orgs & employees work
+
+1. **Admin** creates the workspace (company name + admin email) — or uses the seeded admin.
+2. Admin opens **Team** in the sidebar and adds employees (name, email, temporary password).
+3. Employees sign in and only see that company’s channels, DMs, projects, and tasks.
+4. Open self-registration is disabled once a workspace exists.
+
+**Demo admin:** `raghu@nomi.local` / `password123`  
+**Demo member:** `alex@nomi.local` / `password123`
 
 ---
 

@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireMembership } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export async function GET() {
   try {
-    const user = await requireUser();
-    const users = await prisma.user.findMany({
-      where: { id: { not: user.id } },
-      select: { id: true, name: true, email: true },
-      orderBy: { name: "asc" },
+    const { user, org } = await requireMembership();
+    const members = await prisma.orgMember.findMany({
+      where: {
+        orgId: org.id,
+        userId: { not: user.id },
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: { userId: "asc" },
     });
-    return NextResponse.json(users);
+
+    return NextResponse.json(members.map((m) => m.user));
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

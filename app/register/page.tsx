@@ -9,8 +9,10 @@ export default function RegisterPage() {
             N
           </div>
           <div>
-            <h1 className="text-xl font-semibold">Join Nomi</h1>
-            <p className="text-sm text-[var(--muted)]">Create your account</p>
+            <h1 className="text-xl font-semibold">Create workspace</h1>
+            <p className="text-sm text-[var(--muted)]">
+              First account becomes the org admin
+            </p>
           </div>
         </div>
         <RegisterForm />

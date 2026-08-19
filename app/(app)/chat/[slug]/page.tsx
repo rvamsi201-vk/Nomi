@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireUser } from "@/lib/auth";
+import { requireMembership } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ChatRoom } from "@/components/chat-room";
 
@@ -8,11 +8,13 @@ export default async function ChannelPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const user = await requireUser();
+  const { user, org } = await requireMembership();
   const { slug } = await params;
 
   const channel = await prisma.channel.findUnique({
-    where: { slug },
+    where: {
+      organizationId_slug: { organizationId: org.id, slug },
+    },
     include: {
       members: {
         include: { user: { select: { id: true, name: true } } },

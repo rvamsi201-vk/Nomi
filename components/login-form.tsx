@@ -62,9 +62,9 @@ export function LoginForm() {
         {loading ? "Signing in..." : "Sign in"}
       </button>
       <p className="text-center text-sm text-[var(--muted)]">
-        New?{" "}
+        Need a new company workspace?{" "}
         <Link href="/register" className="text-[var(--accent)]">
-          Create account
+          Create workspace
         </Link>
       </p>
     </form>

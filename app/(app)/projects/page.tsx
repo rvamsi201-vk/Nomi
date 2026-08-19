@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { CreateProjectForm } from "@/components/create-project-form";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireMembership } from "@/lib/auth";
 
 export default async function ProjectsPage() {
-  await requireUser();
+  const { org } = await requireMembership();
 
   const projects = await prisma.project.findMany({
+    where: { organizationId: org.id },
     include: {
       owner: { select: { name: true } },
       channel: { select: { slug: true, name: true } },
@@ -20,7 +21,7 @@ export default async function ProjectsPage() {
       <header className="border-b border-[var(--border)] px-8 py-6">
         <h1 className="text-2xl font-semibold">Projects</h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          Track workstreams and optionally link a chat channel
+          Track workstreams inside {org.name}
         </p>
       </header>
 
