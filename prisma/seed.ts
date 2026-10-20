@@ -74,17 +74,26 @@ async function main() {
     },
   });
 
-  for (const channel of [general, random]) {
-    for (const user of [raghu, alex]) {
-      await prisma.channelMember.upsert({
-        where: {
-          channelId_userId: { channelId: channel.id, userId: user.id },
-        },
-        update: {},
-        create: { channelId: channel.id, userId: user.id },
-      });
-    }
+  for (const user of [raghu, alex]) {
+    await prisma.channelMember.upsert({
+      where: {
+        channelId_userId: { channelId: general.id, userId: user.id },
+      },
+      update: {},
+      create: { channelId: general.id, userId: user.id },
+    });
   }
+
+  await prisma.channelMember.upsert({
+    where: {
+      channelId_userId: { channelId: random.id, userId: raghu.id },
+    },
+    update: {},
+    create: { channelId: random.id, userId: raghu.id },
+  });
+  await prisma.channelMember.deleteMany({
+    where: { channelId: random.id, userId: alex.id },
+  });
 
   const messageCount = await prisma.message.count({
     where: { channelId: general.id },
@@ -138,9 +147,9 @@ async function main() {
         organizationId: org.id,
         name: "proj-nomi-launch",
         slug: "proj-nomi-launch",
-        type: "public",
+        type: "private",
         members: {
-          create: [{ userId: raghu.id }, { userId: alex.id }],
+          create: [{ userId: raghu.id }],
         },
       },
     });
@@ -156,6 +165,17 @@ async function main() {
       },
     });
   }
+
+  await prisma.projectMember.upsert({
+    where: { projectId_userId: { projectId: project.id, userId: raghu.id } },
+    update: {},
+    create: { projectId: project.id, userId: raghu.id },
+  });
+  await prisma.projectMember.upsert({
+    where: { projectId_userId: { projectId: project.id, userId: alex.id } },
+    update: {},
+    create: { projectId: project.id, userId: alex.id },
+  });
 
   const taskCount = await prisma.task.count({
     where: { projectId: project.id },

@@ -77,7 +77,10 @@ export async function POST(request: Request) {
           slug,
           type: "dm",
           members: {
-            create: [{ userId: user.id }, { userId: other.id }],
+            create: [
+              { userId: user.id, lastReadAt: new Date() },
+              { userId: other.id, lastReadAt: new Date() },
+            ],
           },
         },
       });

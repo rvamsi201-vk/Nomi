@@ -2,12 +2,20 @@ import { NextResponse } from "next/server";
 import { requireMembership } from "@/lib/auth";
 import { isTaskStatus } from "@/lib/constants";
 import { prisma } from "@/lib/db";
+import { isProjectMember } from "@/lib/projects";
 
 export async function GET() {
   try {
-    const { org } = await requireMembership();
+    const { user, org, membership } = await requireMembership();
+    const isAdmin = membership.role === "admin";
     const tasks = await prisma.task.findMany({
-      where: { project: { organizationId: org.id } },
+      where: {
+        project: {
+          organizationId: org.id,
+          ...(isAdmin ? {} : { members: { some: { userId: user.id } } }),
+        },
+        ...(isAdmin ? {} : { assigneeId: user.id }),
+      },
       include: {
         project: { select: { id: true, name: true, slug: true } },
         assignee: { select: { id: true, name: true } },
@@ -22,12 +30,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { user, org } = await requireMembership();
+    const { user, org, membership } = await requireMembership();
     const body = await request.json();
     const projectId = String(body.projectId ?? "");
     const title = String(body.title ?? "").trim();
     const status = String(body.status ?? "todo");
     const assigneeId = body.assigneeId ? String(body.assigneeId) : null;
+    const isAdmin = membership.role === "admin";
 
     if (!projectId || !title) {
       return NextResponse.json(
@@ -49,15 +58,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
+    if (!isAdmin && !(await isProjectMember(projectId, user.id))) {
+      return NextResponse.json(
+        { error: "You are not a member of this project" },
+        { status: 403 },
+      );
+    }
+
     if (assigneeId) {
-      const member = await prisma.orgMember.findUnique({
-        where: {
-          orgId_userId: { orgId: org.id, userId: assigneeId },
-        },
-      });
-      if (!member) {
+      const onProject = await isProjectMember(projectId, assigneeId);
+      if (!onProject) {
         return NextResponse.json(
-          { error: "Assignee must be in your workspace" },
+          { error: "Assignee must be on this project" },
           { status: 400 },
         );
       }
@@ -69,6 +81,7 @@ export async function POST(request: Request) {
         title,
         status,
         assigneeId,
+        createdById: user.id,
       },
       include: {
         assignee: { select: { id: true, name: true } },

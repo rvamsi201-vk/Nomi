@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
-import { requireMembership } from "@/lib/auth";
+import { listVisibleChannels } from "@/lib/access";
+import { requireAdmin, requireMembership } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 
 export async function GET() {
   try {
-    const { user, org } = await requireMembership();
-    const channels = await prisma.channel.findMany({
-      where: {
-        organizationId: org.id,
-        type: "public",
-        members: { some: { userId: user.id } },
-      },
-      orderBy: { name: "asc" },
-    });
+    const { user, org, membership } = await requireMembership();
+    const channels = await listVisibleChannels(org.id, user.id, membership.role);
     return NextResponse.json(channels);
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -22,7 +16,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { user, org } = await requireMembership();
+    const { user, org } = await requireAdmin();
     const body = await request.json();
     const name = String(body.name ?? "").trim().replace(/^#/, "");
 
@@ -43,8 +37,8 @@ export async function POST(request: Request) {
       slug = `${base}-${n++}`;
     }
 
-    const members = await prisma.orgMember.findMany({
-      where: { orgId: org.id },
+    const admins = await prisma.orgMember.findMany({
+      where: { orgId: org.id, role: "admin" },
       select: { userId: true },
     });
 
@@ -55,7 +49,7 @@ export async function POST(request: Request) {
         slug,
         type: "public",
         members: {
-          create: members.map((m) => ({ userId: m.userId })),
+          create: admins.map((m) => ({ userId: m.userId, lastReadAt: new Date() })),
         },
       },
     });
@@ -69,7 +63,11 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(channel, { status: 201 });
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "Forbidden") {
+      return NextResponse.json({ error: "Admin only" }, { status: 403 });
+    }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 }

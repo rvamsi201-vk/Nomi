@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { OnlineDot } from "@/components/live-session";
+
 type Member = {
   id: string;
   name: string;
@@ -30,6 +32,9 @@ export function TeamPanel({
   const [role, setRole] = useState("member");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [roleError, setRoleError] = useState("");
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
 
   useEffect(() => {
     setMembers(initialMembers);
@@ -61,9 +66,49 @@ export function TeamPanel({
     router.refresh();
   }
 
+  async function changeRole(userId: string, nextRole: string) {
+    setRoleError("");
+    setUpdatingRoleId(userId);
+    const previous = members.find((m) => m.id === userId)?.role;
+    setMembers((current) =>
+      current.map((member) =>
+        member.id === userId ? { ...member, role: nextRole } : member,
+      ),
+    );
+
+    const res = await fetch(`/api/team/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: nextRole }),
+    });
+
+    setUpdatingRoleId(null);
+
+    if (!res.ok) {
+      const data = await res.json();
+      setRoleError(data.error ?? "Failed to update role");
+      if (previous) {
+        setMembers((current) =>
+          current.map((member) =>
+            member.id === userId ? { ...member, role: previous } : member,
+          ),
+        );
+      }
+      return;
+    }
+
+    router.refresh();
+  }
+
   async function removeMember(userId: string) {
     if (!confirm("Remove this person from the workspace?")) return;
-    await fetch(`/api/team/${userId}`, { method: "DELETE" });
+    setRoleError("");
+    const res = await fetch(`/api/team/${userId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json();
+      setRoleError(data.error ?? "Failed to remove member");
+      return;
+    }
     router.refresh();
   }
 
@@ -132,24 +177,46 @@ export function TeamPanel({
         <div className="border-b border-[var(--border)] px-5 py-4">
           <h2 className="text-sm font-medium">People ({members.length})</h2>
         </div>
+        {roleError ? (
+          <p className="border-b border-[var(--border)] px-5 py-3 text-sm text-rose-400">
+            {roleError}
+          </p>
+        ) : null}
         <ul className="divide-y divide-[var(--border)]">
           {members.map((member) => (
             <li
               key={member.id}
-              className="flex items-center justify-between gap-3 px-5 py-4"
+              className="team-member-row flex items-center justify-between gap-3 px-5 py-4"
             >
-              <div>
-                <p className="text-sm font-medium">{member.name}</p>
-                <p className="text-xs text-[var(--muted)]">{member.email}</p>
+              <div className="flex items-center gap-2">
+                <OnlineDot userId={member.id} label={member.name} />
+                <div>
+                  <p className="text-sm font-medium">{member.name}</p>
+                  <p className="text-xs text-[var(--muted)]">{member.email}</p>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs capitalize text-zinc-300">
-                  {member.role}
-                </span>
+              <div className="team-member-actions flex items-center gap-3">
+                {isAdmin && member.id !== currentUserId ? (
+                  <select
+                    value={member.role}
+                    disabled={updatingRoleId === member.id}
+                    onChange={(e) => void changeRole(member.id, e.target.value)}
+                    className="rounded border border-[var(--border)] bg-transparent px-2 py-1 text-xs capitalize outline-none focus:border-[var(--accent)] disabled:opacity-50"
+                    aria-label={`Role for ${member.name}`}
+                  >
+                    <option value="member">Member</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                ) : (
+                  <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs capitalize text-zinc-300">
+                    {member.role}
+                    {member.id === currentUserId ? " · you" : ""}
+                  </span>
+                )}
                 {isAdmin && member.id !== currentUserId ? (
                   <button
                     type="button"
-                    onClick={() => removeMember(member.id)}
+                    onClick={() => void removeMember(member.id)}
                     className="text-xs text-rose-300 hover:text-rose-200"
                   >
                     Remove

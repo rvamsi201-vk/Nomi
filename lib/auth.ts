@@ -1,12 +1,43 @@
 import { cookies } from "next/headers";
 import { compare, hash } from "bcryptjs";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/db";
 
 const SESSION = "nomi_user_id";
 
+function sessionSecret() {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error("SESSION_SECRET must be at least 32 characters");
+  }
+  return secret;
+}
+
+function signUserId(userId: string) {
+  return createHmac("sha256", sessionSecret()).update(userId).digest("hex");
+}
+
+function verifySession(value: string) {
+  const separator = value.lastIndexOf(".");
+  if (separator < 1) return null;
+  const userId = value.slice(0, separator);
+  const supplied = value.slice(separator + 1);
+  const expected = signUserId(userId);
+  const suppliedBuffer = Buffer.from(supplied, "hex");
+  const expectedBuffer = Buffer.from(expected, "hex");
+  if (
+    suppliedBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(suppliedBuffer, expectedBuffer)
+  ) {
+    return null;
+  }
+  return userId;
+}
+
 export async function getCurrentUser() {
   const store = await cookies();
-  const userId = store.get(SESSION)?.value;
+  const value = store.get(SESSION)?.value;
+  const userId = value ? verifySession(value) : null;
   if (!userId) return null;
   return prisma.user.findUnique({ where: { id: userId } });
 }
@@ -41,7 +72,13 @@ export async function requireAdmin() {
 
 export async function createSession(userId: string) {
   const store = await cookies();
-  store.set(SESSION, userId, { httpOnly: true, sameSite: "lax", path: "/" });
+  store.set(SESSION, `${userId}.${signUserId(userId)}`, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
 }
 
 export async function destroySession() {
@@ -57,20 +94,3 @@ export async function verifyPassword(password: string, passwordHash: string) {
   return compare(password, passwordHash);
 }
 
-export async function addUserToPublicChannels(
-  organizationId: string,
-  userId: string,
-) {
-  const channels = await prisma.channel.findMany({
-    where: { organizationId, type: "public" },
-  });
-  for (const channel of channels) {
-    await prisma.channelMember.upsert({
-      where: {
-        channelId_userId: { channelId: channel.id, userId },
-      },
-      update: {},
-      create: { channelId: channel.id, userId },
-    });
-  }
-}

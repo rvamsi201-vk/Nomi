@@ -27,7 +27,7 @@ export function LoginForm() {
       setError(data.error ?? "Login failed");
       return;
     }
-    router.push(searchParams.get("next") || "/chat");
+    router.push(searchParams.get("next") || "/home");
     router.refresh();
   }
 

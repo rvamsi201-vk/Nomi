@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { OnlineDot } from "@/components/live-session";
 
 type Teammate = { id: string; name: string; email: string };
 
@@ -48,9 +49,10 @@ export function StartDmButton({ users }: { users: Teammate[] }) {
             type="button"
             disabled={loading}
             onClick={() => startDm(person.id)}
-            className="w-full rounded-lg px-3 py-2 text-left text-sm text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm disabled:opacity-50 hover:bg-[var(--hover)]"
           >
-            {person.name}
+            <OnlineDot userId={person.id} label={person.name} />
+            <span className="truncate">{person.name}</span>
           </button>
         ))
       )}

@@ -1,90 +1,220 @@
 "use client";
 
+import { useReducer, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TASK_STATUSES } from "@/lib/constants";
+import { formatTime } from "@/lib/utils";
 
 type TaskCard = {
   id: string;
   title: string;
   status: string;
+  createdAt: string | Date;
+  statusUpdatedAt: string | Date;
   assignee?: { id: string; name: string } | null;
 };
 
-export function KanbanBoard({ tasks }: { tasks: TaskCard[] }) {
-  const router = useRouter();
+type UserOption = { id: string; name: string };
 
-  async function moveTask(taskId: string, status: string) {
-    await fetch(`/api/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+export function KanbanBoard({
+  tasks,
+  users,
+  currentUserId,
+  isAdmin,
+}: {
+  tasks: TaskCard[];
+  users: UserOption[];
+  currentUserId: string;
+  isAdmin: boolean;
+}) {
+  const router = useRouter();
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  // Re-rendering snaps a controlled <select> back to the saved assignee after
+  // a cancelled or failed reassign.
+  const [, forceRender] = useReducer((n: number) => n + 1, 0);
+
+  function setError(taskId: string, message: string) {
+    setErrors((prev) => ({ ...prev, [taskId]: message }));
+  }
+
+  function clearError(taskId: string) {
+    setErrors((prev) => {
+      if (!(taskId in prev)) return prev;
+      const next = { ...prev };
+      delete next[taskId];
+      return next;
     });
-    router.refresh();
+  }
+
+  async function patchTask(taskId: string, payload: Record<string, unknown>) {
+    setPendingId(taskId);
+    clearError(taskId);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(taskId, data.error ?? "Could not update this task.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError(taskId, "Network error — the task was not updated.");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  function updateTask(taskId: string, status: string) {
+    void patchTask(taskId, { status });
+  }
+
+  function reassignTask(task: TaskCard, assigneeId: string | null) {
+    // Non-admins only see tasks assigned to them, so handing one off makes the
+    // card vanish from their board. Say so before it happens.
+    const leavingMyBoard =
+      !isAdmin &&
+      task.assignee?.id === currentUserId &&
+      assigneeId !== currentUserId;
+
+    if (leavingMyBoard) {
+      const target = assigneeId
+        ? (users.find((u) => u.id === assigneeId)?.name ?? "someone else")
+        : "nobody (unassigned)";
+      const confirmed = confirm(
+        `Hand "${task.title}" over to ${target}?\n\nYou only see tasks assigned to you, so this card will disappear from your board and only an admin can hand it back.`,
+      );
+      if (!confirmed) {
+        forceRender();
+        return;
+      }
+    }
+
+    void patchTask(task.id, { assigneeId });
   }
 
   async function deleteTask(taskId: string) {
-    await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
-    router.refresh();
+    if (!confirm("Delete this task?")) return;
+    setPendingId(taskId);
+    clearError(taskId);
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(taskId, data.error ?? "Could not delete this task.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError(taskId, "Network error — the task was not deleted.");
+    } finally {
+      setPendingId(null);
+    }
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-4">
+    <div className="kanban-board">
       {TASK_STATUSES.map((column) => {
-        const columnTasks = tasks.filter((task) => task.status === column.id);
-
+        const items = tasks.filter((task) => task.status === column.id);
         return (
-          <section
-            key={column.id}
-            className="rounded-xl border border-[var(--border)] bg-[#0f1117]"
-          >
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
-              <div className="flex items-center gap-2">
-                <span className={`h-2.5 w-2.5 rounded-full ${column.color}`} />
-                <h3 className="text-sm font-medium">{column.label}</h3>
-              </div>
-              <span className="text-xs text-[var(--muted)]">
-                {columnTasks.length}
-              </span>
-            </div>
+          <section key={column.id} className="kanban-column">
+            <header className="kanban-column-header">
+              <p className="project-kicker">{String(items.length).padStart(2, "0")}</p>
+              <h3 className="kanban-column-title">{column.label}</h3>
+            </header>
 
-            <div className="space-y-3 p-3">
-              {columnTasks.map((task) => (
-                <article
-                  key={task.id}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-3"
-                >
-                  <h4 className="text-sm font-medium">{task.title}</h4>
-                  <p className="mt-2 text-xs text-zinc-400">
-                    {task.assignee?.name ?? "Unassigned"}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {TASK_STATUSES.filter((item) => item.id !== task.status).map(
-                      (item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => moveTask(task.id, item.id)}
-                          className="rounded-md border border-[var(--border)] px-2 py-1 text-[11px] text-zinc-300 hover:border-[var(--accent)]"
+            <div className="kanban-column-body">
+              {items.map((task) => {
+                const busy = pendingId === task.id;
+                const error = errors[task.id];
+                return (
+                  <article key={task.id} className="kanban-card">
+                    <h4 className="kanban-card-title">{task.title}</h4>
+                    <p className="kanban-card-assignee">
+                      {task.assignee?.name ?? "Unassigned"}
+                    </p>
+                    <dl className="kanban-card-meta">
+                      <div>
+                        <dt>Created</dt>
+                        <dd>{formatTime(task.createdAt)}</dd>
+                      </div>
+                      <div>
+                        <dt>Status updated</dt>
+                        <dd>{formatTime(task.statusUpdatedAt)}</dd>
+                      </div>
+                    </dl>
+
+                    {users.length > 0 ? (
+                      <label className="mt-2 block text-[11px] text-[var(--muted)]">
+                        Reassign
+                        <select
+                          value={task.assignee?.id ?? ""}
+                          disabled={busy}
+                          onChange={(e) =>
+                            reassignTask(
+                              task,
+                              e.target.value ? e.target.value : null,
+                            )
+                          }
+                          className="mt-1 w-full rounded border border-[var(--border)] bg-transparent px-2 py-1 text-xs outline-none focus:border-[var(--accent)] disabled:opacity-50"
+                          aria-label={`Reassign task ${task.title}`}
                         >
-                          {item.label}
-                        </button>
-                      ),
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => deleteTask(task.id)}
-                      className="rounded-md border border-[var(--border)] px-2 py-1 text-[11px] text-rose-300 hover:border-rose-400"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              ))}
+                          <option value="">Unassigned</option>
+                          {users.map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
 
-              {columnTasks.length === 0 ? (
-                <p className="px-1 py-6 text-center text-xs text-[var(--muted)]">
-                  No tasks
-                </p>
+                    {error ? (
+                      <p className="kanban-card-error" role="alert">
+                        {error}
+                      </p>
+                    ) : null}
+
+                    <div className="kanban-card-actions">
+                      <p className="kanban-actions-label">Move to</p>
+                      <div className="kanban-pills">
+                        {TASK_STATUSES.map((item) => {
+                          const active = item.id === task.status;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => updateTask(task.id, item.id)}
+                              disabled={active || busy}
+                              className={
+                                active ? "kanban-pill is-active" : "kanban-pill"
+                              }
+                              aria-current={active ? "true" : undefined}
+                            >
+                              {item.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void deleteTask(task.id)}
+                        disabled={busy}
+                        className="kanban-delete"
+                      >
+                        Delete task
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+
+              {items.length === 0 ? (
+                <p className="kanban-empty">Nothing here yet</p>
               ) : null}
             </div>
           </section>

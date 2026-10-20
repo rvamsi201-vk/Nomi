@@ -24,7 +24,6 @@ export function CreateTaskForm({
     e.preventDefault();
     setLoading(true);
     setError("");
-
     const res = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -35,15 +34,12 @@ export function CreateTaskForm({
         assigneeId: assigneeId || null,
       }),
     });
-
     setLoading(false);
-
     if (!res.ok) {
       const data = await res.json();
-      setError(data.error ?? "Failed to create task");
+      setError(data.error ?? "Failed to add task");
       return;
     }
-
     setTitle("");
     setAssigneeId("");
     setStatus("todo");
@@ -51,51 +47,56 @@ export function CreateTaskForm({
   }
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-5"
-    >
-      <h2 className="text-sm font-medium">Add task</h2>
-      <div className="mt-4 space-y-3">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Task title"
-          required
-          className="w-full rounded-lg border border-[var(--border)] bg-[#0f1117] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
-        />
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="w-full rounded-lg border border-[var(--border)] bg-[#0f1117] px-3 py-2 text-sm outline-none"
-        >
-          {TASK_STATUSES.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={assigneeId}
-          onChange={(e) => setAssigneeId(e.target.value)}
-          className="w-full rounded-lg border border-[var(--border)] bg-[#0f1117] px-3 py-2 text-sm outline-none"
-        >
-          <option value="">Unassigned</option>
-          {users.map((user) => (
-            <option key={user.id} value={user.id}>
-              {user.name}
-            </option>
-          ))}
-        </select>
-        {error ? <p className="text-sm text-rose-400">{error}</p> : null}
+    <form onSubmit={onSubmit} className="border-y border-[var(--border)] py-7">
+      <div className="grid items-end gap-6 lg:grid-cols-[minmax(240px,2fr)_minmax(150px,1fr)_minmax(150px,1fr)_auto]">
+        <label>
+          <span className="mb-2 block text-xs text-[var(--muted)]">Task</span>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="What needs to be done?"
+            required
+            className="w-full py-2.5 outline-none"
+          />
+        </label>
+        <label>
+          <span className="mb-2 block text-xs text-[var(--muted)]">Stage</span>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="w-full py-2.5 outline-none"
+          >
+            {TASK_STATUSES.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span className="mb-2 block text-xs text-[var(--muted)]">Owner</span>
+          <select
+            value={assigneeId}
+            onChange={(e) => setAssigneeId(e.target.value)}
+            className="w-full py-2.5 outline-none"
+          >
+            <option value="">Unassigned</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium disabled:opacity-50"
+          className="bg-[var(--accent)] px-6 py-3 text-sm font-medium disabled:opacity-50"
         >
-          {loading ? "Adding..." : "Add task"}
+          {loading ? "Adding…" : "Add task"}
         </button>
       </div>
+      {error ? <p className="mt-4 text-sm text-rose-700">{error}</p> : null}
     </form>
   );
 }

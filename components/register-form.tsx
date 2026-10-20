@@ -28,7 +28,7 @@ export function RegisterForm() {
       setError(data.error ?? "Registration failed");
       return;
     }
-    router.push("/chat");
+    router.push("/home");
     router.refresh();
   }
 

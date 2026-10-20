@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  addUserToPublicChannels,
-  hashPassword,
-  requireAdmin,
-  requireMembership,
-} from "@/lib/auth";
+import { applyRoleChannelAccess } from "@/lib/access";
+import { hashPassword, requireAdmin, requireMembership } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 export async function GET() {
@@ -74,7 +70,7 @@ export async function POST(request: Request) {
       },
     });
 
-    await addUserToPublicChannels(org.id, employee.id);
+    await applyRoleChannelAccess(org.id, employee.id, role);
 
     const general = await prisma.channel.findUnique({
       where: {

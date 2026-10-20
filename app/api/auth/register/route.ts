@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  addUserToPublicChannels,
-  createSession,
-  hashPassword,
-} from "@/lib/auth";
+import { createSession, hashPassword } from "@/lib/auth";
+import { applyRoleChannelAccess } from "@/lib/access";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 
@@ -64,7 +61,7 @@ export async function POST(request: Request) {
     include: { channels: true },
   });
 
-  await addUserToPublicChannels(org.id, user.id);
+  await applyRoleChannelAccess(org.id, user.id, "admin");
 
   await prisma.message.create({
     data: {

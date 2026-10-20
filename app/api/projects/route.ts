@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
-import { requireMembership } from "@/lib/auth";
+import { syncProjectChannelMembers } from "@/lib/access";
+import { requireAdmin, requireMembership } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 
 export async function GET() {
   try {
-    const { org } = await requireMembership();
+    const { user, org, membership } = await requireMembership();
+    const isAdmin = membership.role === "admin";
     const projects = await prisma.project.findMany({
-      where: { organizationId: org.id },
+      where: {
+        organizationId: org.id,
+        ...(isAdmin
+          ? {}
+          : { members: { some: { userId: user.id } } }),
+      },
       include: {
         owner: { select: { id: true, name: true } },
         channel: { select: { id: true, slug: true, name: true } },
@@ -23,7 +30,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { user, org } = await requireMembership();
+    const { user, org } = await requireAdmin();
     const body = await request.json();
     const name = String(body.name ?? "").trim();
     const description = String(body.description ?? "").trim();
@@ -63,19 +70,25 @@ export async function POST(request: Request) {
         cSlug = `${channelName}-${i++}`;
       }
 
-      const members = await prisma.orgMember.findMany({
-        where: { orgId: org.id },
+      const admins = await prisma.orgMember.findMany({
+        where: { orgId: org.id, role: "admin" },
         select: { userId: true },
       });
+      const channelMembers = [
+        ...new Set([user.id, ...admins.map((member) => member.userId)]),
+      ];
 
       const channel = await prisma.channel.create({
         data: {
           organizationId: org.id,
           name: cSlug,
           slug: cSlug,
-          type: "public",
+          type: "private",
           members: {
-            create: members.map((m) => ({ userId: m.userId })),
+            create: channelMembers.map((userId) => ({
+              userId,
+              lastReadAt: new Date(),
+            })),
           },
           messages: {
             create: {
@@ -97,6 +110,9 @@ export async function POST(request: Request) {
         description,
         ownerId: user.id,
         channelId,
+        members: {
+          create: { userId: user.id },
+        },
       },
       include: {
         owner: { select: { id: true, name: true } },
@@ -104,8 +120,17 @@ export async function POST(request: Request) {
       },
     });
 
+    await syncProjectChannelMembers(project.id);
+
     return NextResponse.json({ ...project, channelSlug }, { status: 201 });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "Forbidden") {
+      return NextResponse.json({ error: "Admin only" }, { status: 403 });
+    }
+    if (message === "Unauthorized" || message === "No organization") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     console.error(error);
     return NextResponse.json({ error: "Failed to create project" }, { status: 500 });
   }

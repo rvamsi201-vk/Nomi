@@ -1,9 +1,15 @@
 import Link from "next/link";
+import { listVisibleChannels } from "@/lib/access";
 import { getCurrentUser, getMembership } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { CreateChannelForm } from "@/components/create-channel-form";
 import { LogoutButton } from "@/components/logout-button";
 import { StartDmButton } from "@/components/start-dm-button";
+import { DmNav } from "@/components/dm-nav";
+import { LiveSession, OnlineDot } from "@/components/live-session";
+import { AppShell } from "@/components/app-shell";
+import { ChannelNav } from "@/components/channel-nav";
+import { UnreadProvider } from "@/components/unread";
 
 export default async function AppLayout({
   children,
@@ -15,15 +21,8 @@ export default async function AppLayout({
   const orgId = membership?.orgId;
 
   const channels =
-    user && orgId
-      ? await prisma.channel.findMany({
-          where: {
-            organizationId: orgId,
-            type: "public",
-            members: { some: { userId: user.id } },
-          },
-          orderBy: { name: "asc" },
-        })
+    user && orgId && membership
+      ? await listVisibleChannels(orgId, user.id, membership.role)
       : [];
 
   const dmChannels =
@@ -62,15 +61,15 @@ export default async function AppLayout({
       id: channel.id,
       slug: channel.slug,
       name: other?.name ?? "DM",
+      otherUserId: other?.id ?? null,
     };
   });
 
-  return (
-    <div className="flex h-screen overflow-hidden bg-[var(--bg)]">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-[var(--border)] bg-[var(--card)]">
+  const sidebar = (
+    <>
         <div className="border-b border-[var(--border)] px-5 py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent)] text-sm font-bold">
+            <div className="flex h-9 w-9 items-center justify-center bg-[var(--accent)] text-sm font-bold">
               N
             </div>
             <div>
@@ -86,35 +85,17 @@ export default async function AppLayout({
           <p className="mb-2 px-2 text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
             Channels
           </p>
-          <nav className="space-y-0.5">
-            {channels.map((channel) => (
-              <Link
-                key={channel.id}
-                href={`/chat/${channel.slug}`}
-                className="block rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 hover:text-white"
-              >
-                # {channel.name}
-              </Link>
-            ))}
-          </nav>
-          <div className="mt-2">
-            <CreateChannelForm />
-          </div>
+          <ChannelNav channels={channels} />
+          {membership?.role === "admin" ? (
+            <div className="mt-2">
+              <CreateChannelForm />
+            </div>
+          ) : null}
 
           <p className="mb-2 mt-6 px-2 text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
             Direct messages
           </p>
-          <nav className="space-y-0.5">
-            {dms.map((dm) => (
-              <Link
-                key={dm.id}
-                href={`/chat/${dm.slug}`}
-                className="block rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 hover:text-white"
-              >
-                · {dm.name}
-              </Link>
-            ))}
-          </nav>
+          <DmNav dms={dms} />
           <div className="mt-2">
             <StartDmButton users={teammates} />
           </div>
@@ -123,40 +104,52 @@ export default async function AppLayout({
             Workspace
           </p>
           <nav className="space-y-0.5">
-            <Link
-              href="/projects"
-              className="block rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 hover:text-white"
-            >
+            <Link href="/projects" className="nav-link">
               Projects
             </Link>
-            <Link
-              href="/tasks"
-              className="block rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 hover:text-white"
-            >
+            <Link href="/tasks" className="nav-link">
               Tasks
             </Link>
-            <Link
-              href="/team"
-              className="block rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-white/5 hover:text-white"
-            >
+            <Link href="/notes" className="nav-link">
+              Notes
+            </Link>
+            <Link href="/docs" className="nav-link">
+              Docs
+            </Link>
+            <Link href="/team" className="nav-link">
               Team
+            </Link>
+            <Link href="/timesheet" className="nav-link">
+              Time Sheet
+            </Link>
+            <Link href="/settings" className="nav-link">
+              Settings
             </Link>
           </nav>
         </div>
 
         <div className="border-t border-[var(--border)] p-4">
-          <p className="mb-1 text-sm font-medium">{user?.name}</p>
+          <p className="mb-1 flex items-center gap-2 text-sm font-medium">
+            <OnlineDot userId={user?.id} label={user?.name} />
+            {user?.name}
+          </p>
           <p className="mb-1 truncate text-xs text-[var(--muted)]">{user?.email}</p>
           {membership ? (
-            <p className="mb-3 text-[11px] capitalize text-zinc-500">
+            <p className="mb-3 text-[11px] capitalize text-[var(--muted)]">
               {membership.role}
             </p>
           ) : null}
           <LogoutButton />
         </div>
-      </aside>
+    </>
+  );
 
-      <main className="flex min-w-0 flex-1 flex-col">{children}</main>
-    </div>
+  const shell = <AppShell sidebar={sidebar}>{children}</AppShell>;
+
+  if (!user) return shell;
+  return (
+    <LiveSession currentUserId={user.id}>
+      <UnreadProvider>{shell}</UnreadProvider>
+    </LiveSession>
   );
 }
