@@ -151,6 +151,8 @@ export default async function ProjectDetailPage({
               users={assigneeOptions}
               currentUserId={user.id}
               isAdmin={isAdmin}
+              projectId={project.id}
+              canAddTasks={canAddTasks}
             />
           </div>
         </section>

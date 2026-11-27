@@ -49,6 +49,21 @@ model User {
   docFolderMemberships DocFolderMember[]
   uploadedDocFiles   DocFile[]
   timeEntries        TimeEntry[]
+  apiTokens          ApiToken[]
+  nomiraConversations NomiraConversation[]
+}
+
+model ApiToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  name       String
+  prefix     String
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Channel {
@@ -244,4 +259,27 @@ model TimeEntry {
 
   @@index([organizationId, userId, startedAt])
   @@index([userId, endedAt])
+}
+
+model NomiraConversation {
+  id        String          @id @default(cuid())
+  userId    String
+  title     String          @default("New chat")
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  NomiraMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model NomiraMessage {
+  id             String            @id @default(cuid())
+  conversationId String
+  role           String // user | assistant
+  content        String
+  createdAt      DateTime          @default(now())
+  conversation   NomiraConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }

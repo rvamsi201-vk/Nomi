@@ -104,6 +104,9 @@ export default async function AppLayout({
             Workspace
           </p>
           <nav className="space-y-0.5">
+            <Link href="/nomira" className="nav-link">
+              Nomira AI
+            </Link>
             <Link href="/projects" className="nav-link">
               Projects
             </Link>

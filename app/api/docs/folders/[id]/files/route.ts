@@ -6,7 +6,7 @@ import { requireMembership } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getOrgFolder, uploadsRoot, userCanAccessFolder } from "@/lib/docs";
 
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_FILE_BYTES = 1024 * 1024 * 1024; // 1 GB
 const MAX_FILES = 10;
 const ALLOWED_EXT = new Set([
   "pdf",
@@ -93,7 +93,7 @@ export async function POST(
     for (const file of files) {
       if (file.size > MAX_FILE_BYTES) {
         return NextResponse.json(
-          { error: "Each file must be 10MB or smaller" },
+          { error: "Each file must be 1GB or smaller" },
           { status: 400 },
         );
       }

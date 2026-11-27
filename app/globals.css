@@ -69,6 +69,27 @@ html.dark .linkified-url:hover { color: #a6e08a; }
   border-bottom: 1px solid var(--border);
   padding: 1rem 1rem 0.85rem;
 }
+.kanban-column-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.kanban-paste-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  padding: 0.22rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.kanban-paste-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .kanban-column-title {
   margin-top: 0.35rem;
   font-size: 1.15rem;
@@ -187,6 +208,96 @@ html.dark .linkified-url:hover { color: #a6e08a; }
   text-align: center;
   font-size: 0.82rem;
   color: var(--muted);
+}
+
+.paste-list-modal {
+  width: min(560px, 100%);
+  max-height: min(90vh, 720px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 1.25rem 1.35rem 1.5rem;
+}
+.paste-list-label {
+  display: block;
+  margin-top: 1.1rem;
+}
+.paste-list-textarea {
+  width: 100%;
+  min-height: 12rem;
+  resize: vertical;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  padding: 0.85rem 1rem;
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+.paste-list-hint {
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.paste-list-preview {
+  margin-top: 0.9rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.85rem;
+}
+.paste-list-preview-count {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.paste-list-preview-items {
+  margin-top: 0.55rem;
+  padding-left: 1.2rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.paste-list-preview-more {
+  list-style: none;
+  margin-left: -1.2rem;
+  font-style: italic;
+}
+.paste-list-error {
+  margin-top: 0.75rem;
+  font-size: 0.82rem;
+  color: #c24141;
+}
+.paste-list-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.15rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.paste-list-submit {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.paste-list-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.paste-list-submit:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .notes-layout {

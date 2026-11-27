@@ -1,0 +1,26 @@
+{
+  "name": "mcp-nomi",
+  "version": "1.0.0",
+  "description": "Nomi MCP server + CLI for Claude, Codex, and Cursor",
+  "type": "module",
+  "bin": {
+    "nomi": "./src/cli.js",
+    "mcp-nomi": "./src/mcp-stdio.js",
+    "mcp-nomi-http": "./src/mcp-http.js"
+  },
+  "scripts": {
+    "start": "node src/mcp-stdio.js",
+    "http": "node src/mcp-http.js",
+    "cli": "node src/cli.js",
+    "agent": "node nomira-agent-server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "dotenv": "^16.4.7",
+    "express": "^4.22.3",
+    "zod": "^3.24.2"
+  }
+}

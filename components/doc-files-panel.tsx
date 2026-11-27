@@ -15,7 +15,8 @@ type DocFileItem = {
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 export function DocFilesPanel({
@@ -79,7 +80,7 @@ export function DocFilesPanel({
         Documents in this folder
       </h2>
       <p className="mt-2 text-sm text-[var(--muted)]">
-        PDF, Office, images, audio, video, markdown, csv, and zip — up to 10MB
+        PDF, Office, images, audio, video, markdown, csv, and zip — up to 1GB
         each.
       </p>
 

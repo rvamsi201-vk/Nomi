@@ -1,7 +1,10 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { compare, hash } from "bcryptjs";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { generateApiToken, hashApiToken } from "@/lib/api-token";
 import { prisma } from "@/lib/db";
+
+export { generateApiToken, hashApiToken } from "@/lib/api-token";
 
 const SESSION = "nomi_user_id";
 
@@ -34,7 +37,32 @@ function verifySession(value: string) {
   return userId;
 }
 
+async function userFromBearer() {
+  const hdrs = await headers();
+  const auth = hdrs.get("authorization");
+  if (!auth?.toLowerCase().startsWith("bearer ")) return null;
+  const token = auth.slice(7).trim();
+  if (!token) return null;
+
+  const tokenHash = hashApiToken(token);
+  const row = await prisma.apiToken.findUnique({
+    where: { tokenHash },
+    include: { user: true },
+  });
+  if (!row) return null;
+
+  await prisma.apiToken.update({
+    where: { id: row.id },
+    data: { lastUsedAt: new Date() },
+  });
+
+  return row.user;
+}
+
 export async function getCurrentUser() {
+  const bearerUser = await userFromBearer();
+  if (bearerUser) return bearerUser;
+
   const store = await cookies();
   const value = store.get(SESSION)?.value;
   const userId = value ? verifySession(value) : null;
@@ -93,4 +121,3 @@ export async function hashPassword(password: string) {
 export async function verifyPassword(password: string, passwordHash: string) {
   return compare(password, passwordHash);
 }
-

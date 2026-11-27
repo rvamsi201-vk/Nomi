@@ -1,0 +1,62 @@
+services:
+  nomi:
+    container_name: nomi
+    build:
+      context: ./source
+    restart: unless-stopped
+    init: true
+    depends_on:
+      - nomira-agent
+      - nomi-mcp
+    env_file:
+      - ./source/.env
+      - /srv/apps/shared/mcp-nomi/.env
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+      NOMIRA_ENGINE: codex
+      NOMIRA_AGENT_URL: http://172.17.0.1:3015
+    volumes:
+      - ./data/uploads:/app/data/uploads
+    ports:
+      - "127.0.0.1:3002:3000"
+
+  # Host network so Codex can reach OpenAI.
+  nomira-agent:
+    container_name: nomira-agent
+    build:
+      context: ./source/mcp
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - /srv/apps/shared/mcp-nomi/.env
+    environment:
+      NODE_ENV: production
+      NOMIRA_AGENT_PORT: "3015"
+      CODEX_BIN: /opt/codex/codex
+      PATH: /opt/codex:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      NOMIRA_WORKDIR: /srv/apps/nomi
+      HOME: /root
+      NOMI_BASE_URL: http://127.0.0.1:3002
+    volumes:
+      - /root/.cursor-server/extensions/openai.chatgpt-26.1120.50957-linux-x64/bin/linux-x86_64:/opt/codex:ro
+      - /root/.codex:/root/.codex
+      - ./source/mcp:/srv/apps/shared/mcp-nomi:ro
+      - /srv/apps/nomi:/srv/apps/nomi:ro
+
+  # Public Streamable HTTP MCP (proxied at https://nomi.exora.solutions/mcp)
+  nomi-mcp:
+    container_name: nomi-mcp
+    build:
+      context: ./source/mcp
+    restart: unless-stopped
+    command: ["node", "src/mcp-http.js"]
+    env_file:
+      - /srv/apps/shared/mcp-nomi/.env
+    environment:
+      NODE_ENV: production
+      MCP_HTTP_HOST: "0.0.0.0"
+      MCP_HTTP_PORT: "3016"
+      NOMI_BASE_URL: http://172.17.0.1:3002
+    ports:
+      - "127.0.0.1:3016:3016"

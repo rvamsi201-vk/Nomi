@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ensureChannelReadRow, userCanAccessChannel } from "@/lib/access";
 import { requireMembership } from "@/lib/auth";
+import { maybeNomiraDmReply } from "@/lib/nomira-agent";
 import { prisma } from "@/lib/db";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -135,6 +136,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         data: { channelId: id, userId: user.id, text },
         include: { user: { select: { id: true, name: true } } },
       });
+      // Nomira auto-replies in her DM threads (async; chat polls every 3s).
+      void maybeNomiraDmReply({
+        channelId: id,
+        senderId: user.id,
+        senderName: user.name,
+        text,
+      }).catch((err) => console.error("[nomira-dm]", err));
       return NextResponse.json({ messages: [message] }, { status: 201 });
     }
 
